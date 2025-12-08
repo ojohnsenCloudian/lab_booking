@@ -36,7 +36,7 @@ services:
         condition: service_healthy
     volumes:
       - ./prisma:/app/prisma
-    command: sh -c "cd /app && node node_modules/prisma/build/index.js migrate deploy || true && exec node server.js"
+    command: sh -c "cd /app && if [ -d prisma/migrations ] && [ \"$(ls -A prisma/migrations)\" ]; then node node_modules/prisma/build/index.js migrate deploy; else node node_modules/prisma/build/index.js db push --accept-data-loss; fi && exec node server.js"
 
 volumes:
   postgres_data:
