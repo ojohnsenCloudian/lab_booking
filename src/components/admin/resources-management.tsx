@@ -97,7 +97,7 @@ export function ResourcesManagement() {
 
       setIsDialogOpen(false)
       setEditingResource(null)
-      setFormData({ name: "", description: "", isActive: true, connectionMetadata: {} })
+      setFormData({ name: "", description: "", resourceType: "SSH", isActive: true, connectionMetadata: {} })
       setConnectionField({ key: "", value: "" })
       fetchResources()
     } catch (error) {
