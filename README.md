@@ -27,7 +27,7 @@ Follow these steps to get the application running:
 ### Step 1: Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/ojohnsenCloudian/lab_booking.git
 cd lab_booking
 ```
 
