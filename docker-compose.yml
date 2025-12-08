@@ -36,7 +36,7 @@ services:
         condition: service_healthy
     volumes:
       - ./prisma:/app/prisma
-    command: sh -c "npx prisma migrate deploy && (npx prisma db seed || true) && node server.js"
+    command: sh -c "cd /app && node node_modules/prisma/build/index.js migrate deploy || true && exec node server.js"
 
 volumes:
   postgres_data:
