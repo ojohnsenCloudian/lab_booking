@@ -48,6 +48,7 @@ export function TemplatesManagement() {
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<ConnectionTemplate | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     type: "SSH" as "SSH" | "WEB_URL" | "API_KEY" | "VPN",
@@ -78,7 +79,21 @@ export function TemplatesManagement() {
 
       if (templatesResponse.ok) {
         const templatesData = await templatesResponse.json()
-        setTemplates(Array.isArray(templatesData) ? templatesData : [])
+        // Validate and normalize template data
+        const normalizedTemplates = Array.isArray(templatesData)
+          ? templatesData
+              .filter((t: any) => t && t.id)
+              .map((t: any) => ({
+                ...t,
+                fields: t.fields && typeof t.fields === "object" && !Array.isArray(t.fields) 
+                  ? t.fields 
+                  : {},
+                bookingType: t.bookingType && t.bookingType.id && t.bookingType.name
+                  ? { id: String(t.bookingType.id), name: String(t.bookingType.name) }
+                  : null,
+              }))
+          : []
+        setTemplates(normalizedTemplates)
       } else {
         setTemplates([])
       }
@@ -87,20 +102,24 @@ export function TemplatesManagement() {
         const typesData = await typesResponse.json()
         // Extract just id and name from booking types
         const simplifiedTypes = Array.isArray(typesData)
-          ? typesData.map((type: any) => ({
-              id: type.id,
-              name: type.name,
-            }))
+          ? typesData
+              .filter((type: any) => type && type.id && type.name)
+              .map((type: any) => ({
+                id: String(type.id),
+                name: String(type.name),
+              }))
           : []
         setBookingTypes(simplifiedTypes)
       } else {
         setBookingTypes([])
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching data:", error)
+      const errorMessage = error?.message || "Failed to load data"
+      setError(errorMessage)
       toast({
         title: "Error",
-        description: "Failed to load data",
+        description: errorMessage,
         variant: "destructive",
       })
       setTemplates([])
@@ -219,12 +238,17 @@ export function TemplatesManagement() {
 
   const handleEdit = (template: ConnectionTemplate) => {
     setEditingTemplate(template)
+    // Ensure fields is a proper object
+    const fields = template.fields && typeof template.fields === "object" && !Array.isArray(template.fields)
+      ? template.fields as Record<string, any>
+      : {}
+    
     setFormData({
-      name: template.name,
-      type: template.type,
-      bookingTypeId: template.bookingTypeId || "",
-      isActive: template.isActive,
-      fields: template.fields as Record<string, any>,
+      name: String(template.name || ""),
+      type: template.type || "SSH",
+      bookingTypeId: template.bookingTypeId ? String(template.bookingTypeId) : "",
+      isActive: Boolean(template.isActive),
+      fields: fields,
     })
     setIsDialogOpen(true)
   }
@@ -256,6 +280,19 @@ export function TemplatesManagement() {
         variant: "destructive",
       })
     }
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <p className="text-destructive mb-4">Error: {error}</p>
+          <Button onClick={() => { setError(null); fetchData(); }}>
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -322,9 +359,9 @@ export function TemplatesManagement() {
                 <div className="space-y-2">
                   <Label htmlFor="bookingType">Booking Type (Optional)</Label>
                   <Select
-                    value={formData.bookingTypeId}
+                    value={formData.bookingTypeId || ""}
                     onValueChange={(value) =>
-                      setFormData({ ...formData, bookingTypeId: value })
+                      setFormData({ ...formData, bookingTypeId: value === "" ? "" : value })
                     }
                   >
                     <SelectTrigger id="bookingType">
@@ -332,12 +369,16 @@ export function TemplatesManagement() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">Global (all booking types)</SelectItem>
-                      {bookingTypes && bookingTypes.length > 0
-                        ? bookingTypes.map((type) => (
-                            <SelectItem key={type.id} value={type.id}>
-                              {type.name}
-                            </SelectItem>
-                          ))
+                      {Array.isArray(bookingTypes) && bookingTypes.length > 0
+                        ? bookingTypes.map((type) => {
+                            const typeId = String(type.id || "")
+                            const typeName = String(type.name || "")
+                            return typeId && typeName ? (
+                              <SelectItem key={typeId} value={typeId}>
+                                {typeName}
+                              </SelectItem>
+                            ) : null
+                          })
                         : null}
                     </SelectContent>
                   </Select>
@@ -346,28 +387,31 @@ export function TemplatesManagement() {
                 <div className="space-y-4 border-t pt-4">
                   <Label>Template Fields</Label>
                   <div className="space-y-2">
-                    {Object.entries(formData.fields).map(([key, field]) => (
-                      <div
-                        key={key}
-                        className="flex items-center justify-between rounded-md border p-2"
-                      >
-                        <div className="flex-1">
-                          <span className="font-medium">{key}</span>
-                          <span className="text-sm text-muted-foreground ml-2">
-                            ({field.type}) - {field.label}
-                            {field.required && " *"}
-                          </span>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveField(key)}
+                    {Object.entries(formData.fields || {}).map(([key, field]) => {
+                      const fieldObj = field && typeof field === "object" ? field : {}
+                      return (
+                        <div
+                          key={String(key)}
+                          className="flex items-center justify-between rounded-md border p-2"
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                          <div className="flex-1">
+                            <span className="font-medium">{String(key)}</span>
+                            <span className="text-sm text-muted-foreground ml-2">
+                              ({String(fieldObj.type || "string")}) - {String(fieldObj.label || "")}
+                              {fieldObj.required && " *"}
+                            </span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveField(String(key))}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )
+                    })}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -463,9 +507,9 @@ export function TemplatesManagement() {
                   <div>
                     <CardTitle>{template.name}</CardTitle>
                     <CardDescription>
-                      {template.type} •{" "}
-                      {template.bookingType
-                        ? template.bookingType.name
+                      {String(template.type)} •{" "}
+                      {template.bookingType && template.bookingType.name
+                        ? String(template.bookingType.name)
                         : "Global"}
                     </CardDescription>
                   </div>
@@ -493,13 +537,14 @@ export function TemplatesManagement() {
                   <div className="flex flex-wrap gap-2">
                     {template.fields &&
                     typeof template.fields === "object" &&
+                    !Array.isArray(template.fields) &&
                     Object.keys(template.fields).length > 0
                       ? Object.keys(template.fields).map((key) => (
                           <span
-                            key={key}
+                            key={String(key)}
                             className="rounded-md bg-muted px-2 py-1 text-xs"
                           >
-                            {key}
+                            {String(key)}
                           </span>
                         ))
                       : <span className="text-xs text-muted-foreground">No fields</span>}
