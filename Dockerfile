@@ -11,6 +11,9 @@ RUN if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install 
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# Install OpenSSL 1.1.x compatibility for Prisma on ARM64
+RUN apk add --no-cache openssl1.1-compat
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
@@ -27,6 +30,9 @@ WORKDIR /app
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
+
+# Install OpenSSL 1.1.x compatibility for Prisma on ARM64
+RUN apk add --no-cache openssl1.1-compat
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
