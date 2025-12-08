@@ -21,6 +21,7 @@ export default function InitialSetupPage() {
 
   useEffect(() => {
     checkAdminExists()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const checkAdminExists = async () => {

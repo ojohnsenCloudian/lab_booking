@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    if (bookingType?.connectionTemplates.length > 0) {
+    if (bookingType?.connectionTemplates && bookingType.connectionTemplates.length > 0) {
       const template = bookingType.connectionTemplates[0]
       const values: Record<string, any> = {}
 

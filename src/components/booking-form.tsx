@@ -35,6 +35,7 @@ export function BookingForm() {
 
   useEffect(() => {
     fetchBookingTypes()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

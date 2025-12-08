@@ -19,6 +19,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     checkAdminExists()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const checkAdminExists = async () => {

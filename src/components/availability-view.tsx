@@ -47,12 +47,14 @@ export function AvailabilityView() {
 
   useEffect(() => {
     fetchBookingTypes()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     if (selectedBookingType) {
       fetchBookings()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBookingType, currentWeek])
 
   const fetchBookingTypes = async () => {
