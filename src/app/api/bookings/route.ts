@@ -130,64 +130,88 @@ export async function POST(request: NextRequest) {
       data: { lastBookingDate: new Date() },
     })
 
-    // Generate connection info if template exists
-    const bookingType = await prisma.bookingType.findUnique({
-      where: { id: data.bookingTypeId },
-      include: {
-        connectionTemplates: {
-          where: { isActive: true },
-          take: 1,
-        },
+    // Generate connection info directly from resource metadata
+    const labResource = await prisma.labResource.findUnique({
+      where: { id: validation.availableResourceId! },
+      select: { 
+        connectionMetadata: true,
+        resourceType: true,
+        name: true,
       },
     })
 
-    // Get resource metadata for connection info
-    const labResource = await prisma.labResource.findUnique({
-      where: { id: validation.availableResourceId! },
-      select: { connectionMetadata: true },
-    })
-
-    const resourceMetadata = (labResource?.connectionMetadata as Record<string, any>) || {}
-
-    if (bookingType?.connectionTemplates && bookingType.connectionTemplates.length > 0) {
-      const template = bookingType.connectionTemplates[0]
+    if (labResource && labResource.connectionMetadata) {
+      const resourceMetadata = labResource.connectionMetadata as Record<string, any>
+      const resourceType = labResource.resourceType || "SSH"
       const values: Record<string, any> = {}
 
-      // Generate values based on template fields
-      const fields = template.fields as Record<string, any>
-      for (const [key, field] of Object.entries(fields)) {
-        // First check if resource metadata has this field
-        const metadataKey = key.toLowerCase()
-        const metadataValue = Object.keys(resourceMetadata).find(
-          (k) => k.toLowerCase() === metadataKey
-        )
+      // Generate connection info from resource metadata
+      // For each field in metadata, use it directly or generate per-booking values
+      for (const [key, value] of Object.entries(resourceMetadata)) {
+        const keyLower = key.toLowerCase()
         
-        if (metadataValue && resourceMetadata[metadataValue]) {
-          values[key] = resourceMetadata[metadataValue]
-        } else if (field.type === "string") {
-          if (key.toLowerCase().includes("password") || key.toLowerCase().includes("secret")) {
-            values[key] = generateAccessCode().substring(0, 12)
-          } else if (key.toLowerCase().includes("host")) {
-            values[key] = `lab-${validation.availableResourceId!.substring(0, 8)}.example.com`
-          } else if (key.toLowerCase().includes("url")) {
-            values[key] = `https://lab-${validation.availableResourceId!.substring(0, 8)}.example.com`
-          } else {
-            values[key] = field.default || `lab-${key}`
-          }
-        } else if (field.type === "number") {
-          values[key] = field.default || 22
+        // Generate passwords/secrets/api_keys per booking
+        if (keyLower.includes("password") || keyLower.includes("secret") || keyLower.includes("api_key")) {
+          values[key] = generateAccessCode().substring(0, 12)
         } else {
-          values[key] = field.default || false
+          // Use the value from resource metadata
+          values[key] = value
         }
       }
 
-      await prisma.connectionInfo.create({
-        data: {
-          bookingId: booking.id,
-          templateId: template.id,
-          values,
-        },
-      })
+      // Add defaults based on resource type if not in metadata
+      if (resourceType === "SSH") {
+        if (!values.host && !values.ip) {
+          values.host = `lab-${validation.availableResourceId!.substring(0, 8)}.example.com`
+        }
+        if (!values.port) {
+          values.port = 22
+        }
+        if (!values.username) {
+          values.username = "labuser"
+        }
+        if (!values.password) {
+          values.password = generateAccessCode().substring(0, 12)
+        }
+      } else if (resourceType === "RDP") {
+        if (!values.host && !values.ip) {
+          values.host = `lab-${validation.availableResourceId!.substring(0, 8)}.example.com`
+        }
+        if (!values.port) {
+          values.port = 3389
+        }
+        if (!values.username) {
+          values.username = "labuser"
+        }
+        if (!values.password) {
+          values.password = generateAccessCode().substring(0, 12)
+        }
+      } else if (resourceType === "WEB_URL") {
+        if (!values.url && !values.base_url) {
+          values.url = `https://lab-${validation.availableResourceId!.substring(0, 8)}.example.com`
+        }
+      } else if (resourceType === "VPN") {
+        if (!values.server) {
+          values.server = `vpn-${validation.availableResourceId!.substring(0, 8)}.example.com`
+        }
+      } else if (resourceType === "API_KEY") {
+        if (!values.api_key) {
+          values.api_key = generateAccessCode().substring(0, 12)
+        }
+        if (!values.endpoint) {
+          values.endpoint = `https://api-${validation.availableResourceId!.substring(0, 8)}.example.com`
+        }
+      }
+
+      // Only create connection info if we have values
+      if (Object.keys(values).length > 0) {
+        await prisma.connectionInfo.create({
+          data: {
+            bookingId: booking.id,
+            values,
+          },
+        })
+      }
     }
 
     return NextResponse.json(booking, { status: 201 })

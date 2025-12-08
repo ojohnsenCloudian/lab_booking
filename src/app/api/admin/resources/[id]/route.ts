@@ -6,6 +6,7 @@ import { z } from "zod"
 const resourceSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
+  resourceType: z.enum(["SSH", "WEB_URL", "VPN", "API_KEY", "RDP"]).optional(),
   isActive: z.boolean().optional(),
   connectionMetadata: z.record(z.any()).optional(),
 })

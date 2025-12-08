@@ -33,6 +33,10 @@ interface Booking {
     id: string
     name: string
   }
+  user: {
+    id: string
+    email: string
+  }
   status: string
 }
 
@@ -85,21 +89,27 @@ export function AvailabilityView() {
     try {
       const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 })
       const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 })
+      // Extend range to include cooldown periods (3 days after bookings)
+      const extendedEnd = addDays(weekEnd, 3)
 
       const response = await fetch(
-        `/api/bookings?bookingTypeId=${selectedBookingType}&startDate=${weekStart.toISOString()}&endDate=${weekEnd.toISOString()}`
+        `/api/bookings?bookingTypeId=${selectedBookingType}&startDate=${weekStart.toISOString()}&endDate=${extendedEnd.toISOString()}`
       )
 
       if (response.ok) {
         const data = await response.json()
-        setBookings(data)
+        setBookings(Array.isArray(data) ? data : [])
+      } else {
+        setBookings([])
       }
     } catch (error) {
+      console.error("Error fetching bookings:", error)
       toast({
         title: "Error",
         description: "Failed to load bookings",
         variant: "destructive",
       })
+      setBookings([])
     } finally {
       setIsLoading(false)
     }
@@ -121,12 +131,12 @@ export function AvailabilityView() {
     return slots
   }
 
-  const isSlotBooked = (day: Date, hour: number) => {
+  const getBookingForSlot = (day: Date, hour: number) => {
     const slotStart = new Date(day)
     slotStart.setHours(hour, 0, 0, 0)
     const slotEnd = addHours(slotStart, 1)
 
-    return bookings.some((booking) => {
+    return bookings.find((booking) => {
       const bookingStart = new Date(booking.startTime)
       const bookingEnd = new Date(booking.endTime)
       
@@ -142,6 +152,32 @@ export function AvailabilityView() {
     })
   }
 
+  const isSlotBooked = (day: Date, hour: number) => {
+    return !!getBookingForSlot(day, hour)
+  }
+
+  const getCooldownPeriod = (bookingEnd: Date) => {
+    const cooldownEnd = addDays(bookingEnd, 3)
+    return { start: bookingEnd, end: cooldownEnd }
+  }
+
+  const isSlotInCooldown = (day: Date, hour: number) => {
+    const slotStart = new Date(day)
+    slotStart.setHours(hour, 0, 0, 0)
+
+    return bookings.some((booking) => {
+      const bookingEnd = new Date(booking.endTime)
+      const cooldown = getCooldownPeriod(bookingEnd)
+      
+      // Check if slot is within cooldown period (but not the booking itself)
+      return (
+        slotStart >= cooldown.start &&
+        slotStart < cooldown.end &&
+        slotStart >= bookingEnd
+      )
+    })
+  }
+
   const isSlotAvailable = (day: Date, hour: number) => {
     const slotStart = new Date(day)
     slotStart.setHours(hour, 0, 0, 0)
@@ -151,7 +187,8 @@ export function AvailabilityView() {
       return false
     }
 
-    return !isSlotBooked(day, hour)
+    // Slot is available if not booked and not in cooldown
+    return !isSlotBooked(day, hour) && !isSlotInCooldown(day, hour)
   }
 
   const navigateWeek = (direction: "prev" | "next") => {
@@ -227,7 +264,13 @@ export function AvailabilityView() {
               </div>
             </div>
             <CardDescription>
-              Green = Available, Red = Booked/Buffer Period, Gray = Past
+              <div className="flex flex-wrap gap-4 text-xs">
+                <span><span className="inline-block w-3 h-3 bg-green-100 dark:bg-green-900 rounded mr-1"></span> Available</span>
+                <span><span className="inline-block w-3 h-3 bg-red-200 dark:bg-red-800 rounded mr-1"></span> Booked</span>
+                <span><span className="inline-block w-3 h-3 bg-orange-100 dark:bg-orange-900 rounded mr-1"></span> Buffer (2h)</span>
+                <span><span className="inline-block w-3 h-3 bg-yellow-100 dark:bg-yellow-900 rounded mr-1"></span> Cooldown (3d)</span>
+                <span><span className="inline-block w-3 h-3 bg-muted rounded mr-1"></span> Past</span>
+              </div>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -254,30 +297,55 @@ export function AvailabilityView() {
                       slotStart.setHours(hour, 0, 0, 0)
                       const isPast = isBefore(slotStart, new Date())
                       const isAvailable = isSlotAvailable(day, hour)
-                      const isBooked = isSlotBooked(day, hour)
+                      const booking = getBookingForSlot(day, hour)
+                      const isBooked = !!booking
+                      const isCooldown = isSlotInCooldown(day, hour)
+                      const isBuffer = booking && (
+                        (slotStart >= addHours(new Date(booking.startTime), -2) && slotStart < new Date(booking.startTime)) ||
+                        (slotStart >= new Date(booking.endTime) && slotStart < addHours(new Date(booking.endTime), 2))
+                      )
+
+                      let title = ""
+                      let bgColor = ""
+                      if (isPast) {
+                        title = "Past"
+                        bgColor = "bg-muted opacity-50"
+                      } else if (isBooked && booking) {
+                        const bookingStart = new Date(booking.startTime)
+                        const bookingEnd = new Date(booking.endTime)
+                        if (slotStart >= bookingStart && slotStart < bookingEnd) {
+                          title = `Booked by ${booking.user?.email || "Unknown"}`
+                          bgColor = "bg-red-200 dark:bg-red-800 border-red-400 dark:border-red-600"
+                        } else if (isBuffer) {
+                          title = `Buffer period (2h before/after booking by ${booking.user?.email || "Unknown"})`
+                          bgColor = "bg-orange-100 dark:bg-orange-900 border-orange-300 dark:border-orange-700"
+                        } else {
+                          title = `Booked by ${booking.user?.email || "Unknown"}`
+                          bgColor = "bg-red-100 dark:bg-red-900 border-red-300 dark:border-red-700"
+                        }
+                      } else if (isCooldown) {
+                        title = "Cooldown period (3 days after booking)"
+                        bgColor = "bg-yellow-100 dark:bg-yellow-900 border-yellow-300 dark:border-yellow-700"
+                      } else if (isAvailable) {
+                        title = "Available"
+                        bgColor = "bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700 cursor-pointer hover:bg-green-200 dark:hover:bg-green-800"
+                      } else {
+                        title = "Unavailable"
+                        bgColor = "bg-muted"
+                      }
 
                       return (
                         <div
                           key={`${day.toISOString()}-${hour}`}
-                          className={`p-1 text-xs border rounded ${
-                            isPast
-                              ? "bg-muted opacity-50"
-                              : isBooked
-                              ? "bg-red-100 dark:bg-red-900 border-red-300 dark:border-red-700"
-                              : isAvailable
-                              ? "bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700 cursor-pointer hover:bg-green-200 dark:hover:bg-green-800"
-                              : "bg-muted"
-                          }`}
-                          title={
-                            isPast
-                              ? "Past"
-                              : isBooked
-                              ? "Booked or buffer period"
-                              : isAvailable
-                              ? "Available"
-                              : "Unavailable"
-                          }
-                        />
+                          className={`p-1 text-xs border rounded ${bgColor}`}
+                          title={title}
+                        >
+                          {booking && slotStart >= new Date(booking.startTime) && slotStart < new Date(booking.endTime) && (
+                            <div className="text-[10px] font-medium truncate">
+                              {booking.user?.email?.split("@")[0] || "Booked"}
+                            </div>
+                          )}
+                        </div>
                       )
                     })}
                   </div>

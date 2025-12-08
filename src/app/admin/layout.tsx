@@ -48,9 +48,6 @@ export default async function AdminLayout({
             <Link href="/admin/booking-types" className="text-sm hover:underline">
               Booking Types
             </Link>
-            <Link href="/admin/templates" className="text-sm hover:underline">
-              Templates
-            </Link>
             <Link href="/admin/users" className="text-sm hover:underline">
               Users
             </Link>

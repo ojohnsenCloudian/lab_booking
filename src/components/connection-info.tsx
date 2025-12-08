@@ -5,12 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Copy, Check } from "lucide-react"
 import { useState } from "react"
 import { useToast } from "@/components/ui/use-toast"
-import type { ConnectionInfo, ConnectionTemplate } from "@prisma/client"
+import type { ConnectionInfo } from "@prisma/client"
 
 interface ConnectionInfoDisplayProps {
-  connectionInfo: ConnectionInfo & {
-    template: ConnectionTemplate
-  }
+  connectionInfo: ConnectionInfo
 }
 
 export function ConnectionInfoDisplay({ connectionInfo }: ConnectionInfoDisplayProps) {
@@ -18,7 +16,6 @@ export function ConnectionInfoDisplay({ connectionInfo }: ConnectionInfoDisplayP
   const [copiedFields, setCopiedFields] = useState<Set<string>>(new Set())
 
   const values = connectionInfo.values as Record<string, any>
-  const fields = connectionInfo.template.fields as Record<string, any>
 
   const handleCopy = async (key: string, value: string) => {
     try {
@@ -26,7 +23,7 @@ export function ConnectionInfoDisplay({ connectionInfo }: ConnectionInfoDisplayP
       setCopiedFields(new Set([...copiedFields, key]))
       toast({
         title: "Copied!",
-        description: `${fields[key]?.label || key} copied to clipboard`,
+        description: `${key} copied to clipboard`,
       })
       setTimeout(() => {
         setCopiedFields((prev) => {
@@ -44,9 +41,17 @@ export function ConnectionInfoDisplay({ connectionInfo }: ConnectionInfoDisplayP
     }
   }
 
+  const formatLabel = (key: string) => {
+    // Convert snake_case or camelCase to Title Case
+    return key
+      .replace(/_/g, " ")
+      .replace(/([A-Z])/g, " $1")
+      .replace(/^./, (str) => str.toUpperCase())
+      .trim()
+  }
+
   const renderField = (key: string, value: any) => {
-    const field = fields[key]
-    const label = field?.label || key
+    const label = formatLabel(key)
     const displayValue = String(value)
 
     return (
@@ -75,7 +80,7 @@ export function ConnectionInfoDisplay({ connectionInfo }: ConnectionInfoDisplayP
   return (
     <div className="space-y-4">
       <div className="rounded-md border bg-muted/50 p-4">
-        <p className="mb-4 text-sm font-medium">Template: {connectionInfo.template.name}</p>
+        <p className="mb-4 text-sm font-medium">Connection Information</p>
         <div className="space-y-2">
           {Object.entries(values).map(([key, value]) => renderField(key, value))}
         </div>

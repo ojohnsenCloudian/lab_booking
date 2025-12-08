@@ -96,11 +96,6 @@ export default async function AdminDashboardPage() {
                 Manage Booking Types
               </Button>
             </Link>
-            <Link href="/admin/templates">
-              <Button variant="outline" className="w-full justify-start">
-                Manage Connection Templates
-              </Button>
-            </Link>
             <Link href="/admin/users">
               <Button variant="outline" className="w-full justify-start">
                 Manage Users

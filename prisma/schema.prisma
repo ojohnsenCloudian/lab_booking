@@ -27,7 +27,8 @@ model LabResource {
   id                  String              @id @default(cuid())
   name                String
   description         String?
-  connectionMetadata  Json?               // Store SSH, URLs, and other connection info
+  resourceType        ResourceType        @default(SSH)  // SSH, WEB_URL, VPN, API_KEY
+  connectionMetadata  Json?               // Store SSH (ip, username, password), URLs, VPN config, API keys, etc.
   isActive            Boolean             @default(true)
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
@@ -102,11 +103,9 @@ model ConnectionTemplate {
 model ConnectionInfo {
   id          String            @id @default(cuid())
   bookingId   String            @unique
-  templateId  String
-  values      Json              // Stores actual connection data
+  values      Json              // Stores actual connection data (generated from resource metadata)
   createdAt   DateTime          @default(now())
   booking     Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  template    ConnectionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@map("connection_infos")
 }
@@ -128,5 +127,14 @@ enum ConnectionType {
   WEB_URL
   API_KEY
   VPN
+  RDP
+}
+
+enum ResourceType {
+  SSH
+  WEB_URL
+  VPN
+  API_KEY
+  RDP
 }
 

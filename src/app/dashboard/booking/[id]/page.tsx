@@ -27,11 +27,7 @@ export default async function BookingDetailPage({
     include: {
       bookingType: true,
       labResource: true,
-      connectionInfo: {
-        include: {
-          template: true,
-        },
-      },
+      connectionInfo: true,
     },
   })
 

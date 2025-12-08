@@ -32,9 +32,6 @@ export async function GET(
 
     const connectionInfo = await prisma.connectionInfo.findUnique({
       where: { bookingId },
-      include: {
-        template: true,
-      },
     })
 
     if (!connectionInfo) {

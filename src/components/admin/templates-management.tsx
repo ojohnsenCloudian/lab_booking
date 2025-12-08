@@ -27,7 +27,7 @@ import { Trash2, Plus, Edit } from "lucide-react"
 interface ConnectionTemplate {
   id: string
   name: string
-  type: "SSH" | "WEB_URL" | "API_KEY" | "VPN"
+  type: "SSH" | "WEB_URL" | "API_KEY" | "VPN" | "RDP"
   fields: Record<string, any>
   bookingTypeId: string | null
   bookingType: {
@@ -51,7 +51,7 @@ export function TemplatesManagement() {
   const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: "",
-    type: "SSH" as "SSH" | "WEB_URL" | "API_KEY" | "VPN",
+    type: "SSH" as "SSH" | "WEB_URL" | "API_KEY" | "VPN" | "RDP",
     bookingTypeId: "",
     isActive: true,
     fields: {} as Record<string, any>,
@@ -339,7 +339,7 @@ export function TemplatesManagement() {
                     <Label htmlFor="type">Type</Label>
                     <Select
                       value={formData.type}
-                      onValueChange={(value: "SSH" | "WEB_URL" | "API_KEY" | "VPN") =>
+                      onValueChange={(value: "SSH" | "WEB_URL" | "API_KEY" | "VPN" | "RDP") =>
                         setFormData({ ...formData, type: value })
                       }
                     >
@@ -349,8 +349,9 @@ export function TemplatesManagement() {
                       <SelectContent>
                         <SelectItem value="SSH">SSH</SelectItem>
                         <SelectItem value="WEB_URL">Web URL</SelectItem>
-                        <SelectItem value="API_KEY">API Key</SelectItem>
                         <SelectItem value="VPN">VPN</SelectItem>
+                        <SelectItem value="RDP">RDP</SelectItem>
+                        <SelectItem value="API_KEY">API Key</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

@@ -6,6 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -21,6 +28,7 @@ interface LabResource {
   id: string
   name: string
   description: string | null
+  resourceType: "SSH" | "WEB_URL" | "VPN" | "API_KEY" | "RDP"
   isActive: boolean
   connectionMetadata?: Record<string, any> | null
 }
@@ -32,7 +40,8 @@ export function ResourcesManagement() {
   const [editingResource, setEditingResource] = useState<LabResource | null>(null)
   const [formData, setFormData] = useState({ 
     name: "", 
-    description: "", 
+    description: "",
+    resourceType: "SSH" as "SSH" | "WEB_URL" | "VPN" | "API_KEY" | "RDP",
     isActive: true,
     connectionMetadata: {} as Record<string, any>
   })
@@ -105,6 +114,7 @@ export function ResourcesManagement() {
     setFormData({
       name: resource.name,
       description: resource.description || "",
+      resourceType: resource.resourceType || "SSH",
       isActive: resource.isActive,
       connectionMetadata: resource.connectionMetadata || {},
     })
@@ -174,7 +184,7 @@ export function ResourcesManagement() {
           <DialogTrigger asChild>
             <Button onClick={() => {
               setEditingResource(null)
-              setFormData({ name: "", description: "", isActive: true, connectionMetadata: {} })
+              setFormData({ name: "", description: "", resourceType: "SSH", isActive: true, connectionMetadata: {} })
               setConnectionField({ key: "", value: "" })
             }}>
               Add Resource
@@ -193,16 +203,38 @@ export function ResourcesManagement() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    required
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Name</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="resourceType">Resource Type</Label>
+                    <Select
+                      value={formData.resourceType}
+                      onValueChange={(value: "SSH" | "WEB_URL" | "VPN" | "API_KEY" | "RDP") =>
+                        setFormData({ ...formData, resourceType: value, connectionMetadata: {} })
+                      }
+                    >
+                      <SelectTrigger id="resourceType">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="SSH">SSH</SelectItem>
+                        <SelectItem value="WEB_URL">Web URL</SelectItem>
+                        <SelectItem value="VPN">VPN</SelectItem>
+                        <SelectItem value="RDP">RDP</SelectItem>
+                        <SelectItem value="API_KEY">API Key</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
@@ -215,10 +247,52 @@ export function ResourcesManagement() {
                   />
                 </div>
                 <div className="space-y-4 border-t pt-4">
-                  <Label>Connection Metadata (SSH, URLs, etc.)</Label>
+                  <Label>Connection Information</Label>
                   <p className="text-sm text-muted-foreground">
-                    Add connection information that can be used when generating connection details for bookings
+                    {formData.resourceType === "SSH" && "Add SSH connection details (IP, username, password, port, etc.)"}
+                    {formData.resourceType === "WEB_URL" && "Add Web URL connection details (base_url, endpoint, etc.)"}
+                    {formData.resourceType === "VPN" && "Add VPN connection details (server, config, credentials, etc.)"}
+                    {formData.resourceType === "API_KEY" && "Add API Key connection details (api_key, endpoint, etc.)"}
                   </p>
+                  {formData.resourceType === "SSH" && (
+                    <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                      <p className="font-medium mb-1">Suggested fields for SSH:</p>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        <li>ip or host - Server IP address or hostname</li>
+                        <li>username - SSH username</li>
+                        <li>password - SSH password (will be generated per booking)</li>
+                        <li>port - SSH port (default: 22)</li>
+                      </ul>
+                    </div>
+                  )}
+                  {formData.resourceType === "WEB_URL" && (
+                    <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                      <p className="font-medium mb-1">Suggested fields for Web URL:</p>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        <li>url or base_url - Base URL for the web interface</li>
+                        <li>endpoint - API endpoint if applicable</li>
+                      </ul>
+                    </div>
+                  )}
+                  {formData.resourceType === "VPN" && (
+                    <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                      <p className="font-medium mb-1">Suggested fields for VPN:</p>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        <li>server - VPN server address</li>
+                        <li>config - VPN configuration details</li>
+                        <li>credentials - VPN credentials</li>
+                      </ul>
+                    </div>
+                  )}
+                  {formData.resourceType === "API_KEY" && (
+                    <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                      <p className="font-medium mb-1">Suggested fields for API Key:</p>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        <li>api_key - API key (will be generated per booking)</li>
+                        <li>endpoint - API endpoint URL</li>
+                      </ul>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {Object.entries(formData.connectionMetadata || {}).map(([key, value]) => (
                       <div

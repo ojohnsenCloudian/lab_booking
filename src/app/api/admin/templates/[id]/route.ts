@@ -5,7 +5,7 @@ import { z } from "zod"
 
 const templateSchema = z.object({
   name: z.string().min(1).optional(),
-  type: z.enum(["SSH", "WEB_URL", "API_KEY", "VPN"]).optional(),
+  type: z.enum(["SSH", "WEB_URL", "API_KEY", "VPN", "RDP"]).optional(),
   fields: z.record(z.any()).optional(),
   bookingTypeId: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
