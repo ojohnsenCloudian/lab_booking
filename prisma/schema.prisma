@@ -1,0 +1,131 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  password       String
+  role           Role      @default(USER)
+  lastBookingDate DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  bookings       Booking[]
+
+  @@map("users")
+}
+
+model LabResource {
+  id              String              @id @default(cuid())
+  name            String
+  description     String?
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  bookingTypes    BookingTypeResource[]
+  bookings        Booking[]
+
+  @@map("lab_resources")
+}
+
+model BookingType {
+  id              String              @id @default(cuid())
+  name            String
+  description     String?
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  resources       BookingTypeResource[]
+  bookings        Booking[]
+  connectionTemplates ConnectionTemplate[]
+
+  @@map("booking_types")
+}
+
+model BookingTypeResource {
+  id            String       @id @default(cuid())
+  bookingTypeId String
+  labResourceId String
+  bookingType   BookingType @relation(fields: [bookingTypeId], references: [id], onDelete: Cascade)
+  labResource   LabResource @relation(fields: [labResourceId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingTypeId, labResourceId])
+  @@map("booking_type_resources")
+}
+
+model Booking {
+  id              String            @id @default(cuid())
+  userId          String
+  bookingTypeId   String
+  labResourceId   String
+  startTime       DateTime
+  endTime         DateTime
+  accessCode      String            @unique
+  status          BookingStatus     @default(UPCOMING)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookingType     BookingType       @relation(fields: [bookingTypeId], references: [id], onDelete: Cascade)
+  labResource     LabResource       @relation(fields: [labResourceId], references: [id], onDelete: Cascade)
+  connectionInfo  ConnectionInfo?
+
+  @@index([labResourceId, startTime, endTime])
+  @@index([userId])
+  @@index([bookingTypeId])
+  @@map("bookings")
+}
+
+model ConnectionTemplate {
+  id            String            @id @default(cuid())
+  name          String
+  type          ConnectionType
+  fields        Json              // JSON schema for dynamic fields
+  bookingTypeId String?
+  isActive      Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  bookingType   BookingType?      @relation(fields: [bookingTypeId], references: [id], onDelete: SetNull)
+  connectionInfos ConnectionInfo[]
+
+  @@map("connection_templates")
+}
+
+model ConnectionInfo {
+  id          String            @id @default(cuid())
+  bookingId   String            @unique
+  templateId  String
+  values      Json              // Stores actual connection data
+  createdAt   DateTime          @default(now())
+  booking     Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  template    ConnectionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("connection_infos")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum BookingStatus {
+  UPCOMING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ConnectionType {
+  SSH
+  WEB_URL
+  API_KEY
+  VPN
+}
+
