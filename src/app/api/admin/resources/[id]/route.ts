@@ -7,6 +7,7 @@ const resourceSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   isActive: z.boolean().optional(),
+  connectionMetadata: z.record(z.any()).optional(),
 })
 
 export async function PUT(

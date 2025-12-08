@@ -15,12 +15,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
+import { Trash2, Plus } from "lucide-react"
 
 interface LabResource {
   id: string
   name: string
   description: string | null
   isActive: boolean
+  connectionMetadata?: Record<string, any> | null
 }
 
 export function ResourcesManagement() {
@@ -28,7 +30,13 @@ export function ResourcesManagement() {
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingResource, setEditingResource] = useState<LabResource | null>(null)
-  const [formData, setFormData] = useState({ name: "", description: "", isActive: true })
+  const [formData, setFormData] = useState({ 
+    name: "", 
+    description: "", 
+    isActive: true,
+    connectionMetadata: {} as Record<string, any>
+  })
+  const [connectionField, setConnectionField] = useState({ key: "", value: "" })
   const { toast } = useToast()
 
   useEffect(() => {
@@ -80,7 +88,8 @@ export function ResourcesManagement() {
 
       setIsDialogOpen(false)
       setEditingResource(null)
-      setFormData({ name: "", description: "", isActive: true })
+      setFormData({ name: "", description: "", isActive: true, connectionMetadata: {} })
+      setConnectionField({ key: "", value: "" })
       fetchResources()
     } catch (error) {
       toast({
@@ -97,8 +106,36 @@ export function ResourcesManagement() {
       name: resource.name,
       description: resource.description || "",
       isActive: resource.isActive,
+      connectionMetadata: resource.connectionMetadata || {},
     })
+    setConnectionField({ key: "", value: "" })
     setIsDialogOpen(true)
+  }
+
+  const handleAddConnectionField = () => {
+    if (!connectionField.key) {
+      toast({
+        title: "Error",
+        description: "Field key is required",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setFormData({
+      ...formData,
+      connectionMetadata: {
+        ...formData.connectionMetadata,
+        [connectionField.key]: connectionField.value,
+      },
+    })
+    setConnectionField({ key: "", value: "" })
+  }
+
+  const handleRemoveConnectionField = (key: string) => {
+    const newMetadata = { ...formData.connectionMetadata }
+    delete newMetadata[key]
+    setFormData({ ...formData, connectionMetadata: newMetadata })
   }
 
   const handleDelete = async (id: string) => {
@@ -137,7 +174,8 @@ export function ResourcesManagement() {
           <DialogTrigger asChild>
             <Button onClick={() => {
               setEditingResource(null)
-              setFormData({ name: "", description: "", isActive: true })
+              setFormData({ name: "", description: "", isActive: true, connectionMetadata: {} })
+              setConnectionField({ key: "", value: "" })
             }}>
               Add Resource
             </Button>
@@ -175,6 +213,60 @@ export function ResourcesManagement() {
                       setFormData({ ...formData, description: e.target.value })
                     }
                   />
+                </div>
+                <div className="space-y-4 border-t pt-4">
+                  <Label>Connection Metadata (SSH, URLs, etc.)</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Add connection information that can be used when generating connection details for bookings
+                  </p>
+                  <div className="space-y-2">
+                    {Object.entries(formData.connectionMetadata || {}).map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="flex items-center justify-between rounded-md border p-2"
+                      >
+                        <div className="flex-1">
+                          <span className="font-medium">{key}:</span>
+                          <span className="text-sm text-muted-foreground ml-2">
+                            {String(value)}
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveConnectionField(key)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="Key (e.g., ssh_host, web_url, api_endpoint)"
+                      value={connectionField.key}
+                      onChange={(e) =>
+                        setConnectionField({ ...connectionField, key: e.target.value })
+                      }
+                    />
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Value"
+                        value={connectionField.value}
+                        onChange={(e) =>
+                          setConnectionField({ ...connectionField, value: e.target.value })
+                        }
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleAddConnectionField}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <input
@@ -215,28 +307,47 @@ export function ResourcesManagement() {
                 <CardDescription>{resource.description || "No description"}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`text-sm ${resource.isActive ? "text-green-600" : "text-gray-500"}`}
-                  >
-                    {resource.isActive ? "Active" : "Inactive"}
-                  </span>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(resource)}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`text-sm ${resource.isActive ? "text-green-600" : "text-gray-500"}`}
                     >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDelete(resource.id)}
-                    >
-                      Delete
-                    </Button>
+                      {resource.isActive ? "Active" : "Inactive"}
+                    </span>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(resource)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDelete(resource.id)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </div>
+                  {resource.connectionMetadata && 
+                   typeof resource.connectionMetadata === "object" &&
+                   Object.keys(resource.connectionMetadata).length > 0 && (
+                    <div className="mt-2 pt-2 border-t">
+                      <p className="text-xs font-medium mb-1">Connection Info:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {Object.entries(resource.connectionMetadata).map(([key, value]) => (
+                          <span
+                            key={key}
+                            className="text-xs bg-muted px-2 py-1 rounded"
+                          >
+                            {key}: {String(value)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

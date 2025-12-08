@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { TemplatesManagement } from "@/components/admin/templates-management"
 
+export const dynamic = "force-dynamic"
+
 export default async function AdminTemplatesPage() {
   const session = await auth()
 

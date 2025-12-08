@@ -78,19 +78,33 @@ export function TemplatesManagement() {
 
       if (templatesResponse.ok) {
         const templatesData = await templatesResponse.json()
-        setTemplates(templatesData)
+        setTemplates(Array.isArray(templatesData) ? templatesData : [])
+      } else {
+        setTemplates([])
       }
 
       if (typesResponse.ok) {
         const typesData = await typesResponse.json()
-        setBookingTypes(typesData)
+        // Extract just id and name from booking types
+        const simplifiedTypes = Array.isArray(typesData)
+          ? typesData.map((type: any) => ({
+              id: type.id,
+              name: type.name,
+            }))
+          : []
+        setBookingTypes(simplifiedTypes)
+      } else {
+        setBookingTypes([])
       }
     } catch (error) {
+      console.error("Error fetching data:", error)
       toast({
         title: "Error",
         description: "Failed to load data",
         variant: "destructive",
       })
+      setTemplates([])
+      setBookingTypes([])
     } finally {
       setIsLoading(false)
     }
@@ -318,11 +332,13 @@ export function TemplatesManagement() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">Global (all booking types)</SelectItem>
-                      {bookingTypes.map((type) => (
-                        <SelectItem key={type.id} value={type.id}>
-                          {type.name}
-                        </SelectItem>
-                      ))}
+                      {bookingTypes && bookingTypes.length > 0
+                        ? bookingTypes.map((type) => (
+                            <SelectItem key={type.id} value={type.id}>
+                              {type.name}
+                            </SelectItem>
+                          ))
+                        : null}
                     </SelectContent>
                   </Select>
                 </div>
@@ -432,6 +448,12 @@ export function TemplatesManagement() {
 
       {isLoading ? (
         <p>Loading templates...</p>
+      ) : templates.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            No templates found. Create your first template to get started.
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {templates.map((template) => (
@@ -469,14 +491,18 @@ export function TemplatesManagement() {
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Fields:</p>
                   <div className="flex flex-wrap gap-2">
-                    {Object.keys(template.fields).map((key) => (
-                      <span
-                        key={key}
-                        className="rounded-md bg-muted px-2 py-1 text-xs"
-                      >
-                        {key}
-                      </span>
-                    ))}
+                    {template.fields &&
+                    typeof template.fields === "object" &&
+                    Object.keys(template.fields).length > 0
+                      ? Object.keys(template.fields).map((key) => (
+                          <span
+                            key={key}
+                            className="rounded-md bg-muted px-2 py-1 text-xs"
+                          >
+                            {key}
+                          </span>
+                        ))
+                      : <span className="text-xs text-muted-foreground">No fields</span>}
                   </div>
                   <p
                     className={`text-sm ${

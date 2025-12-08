@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { BookingTypesManagement } from "@/components/admin/booking-types-management"
 
+export const dynamic = "force-dynamic"
+
 export default async function AdminBookingTypesPage() {
   const session = await auth()
 

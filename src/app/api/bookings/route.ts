@@ -141,6 +141,14 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // Get resource metadata for connection info
+    const labResource = await prisma.labResource.findUnique({
+      where: { id: validation.availableResourceId! },
+      select: { connectionMetadata: true },
+    })
+
+    const resourceMetadata = (labResource?.connectionMetadata as Record<string, any>) || {}
+
     if (bookingType?.connectionTemplates && bookingType.connectionTemplates.length > 0) {
       const template = bookingType.connectionTemplates[0]
       const values: Record<string, any> = {}
@@ -148,7 +156,15 @@ export async function POST(request: NextRequest) {
       // Generate values based on template fields
       const fields = template.fields as Record<string, any>
       for (const [key, field] of Object.entries(fields)) {
-        if (field.type === "string") {
+        // First check if resource metadata has this field
+        const metadataKey = key.toLowerCase()
+        const metadataValue = Object.keys(resourceMetadata).find(
+          (k) => k.toLowerCase() === metadataKey
+        )
+        
+        if (metadataValue && resourceMetadata[metadataValue]) {
+          values[key] = resourceMetadata[metadataValue]
+        } else if (field.type === "string") {
           if (key.toLowerCase().includes("password") || key.toLowerCase().includes("secret")) {
             values[key] = generateAccessCode().substring(0, 12)
           } else if (key.toLowerCase().includes("host")) {
