@@ -47,7 +47,6 @@ model BookingType {
   updatedAt       DateTime            @updatedAt
   resources       BookingTypeResource[]
   bookings        Booking[]
-  connectionTemplates ConnectionTemplate[]
 
   @@map("booking_types")
 }
@@ -85,21 +84,6 @@ model Booking {
   @@map("bookings")
 }
 
-model ConnectionTemplate {
-  id            String            @id @default(cuid())
-  name          String
-  type          ConnectionType
-  fields        Json              // JSON schema for dynamic fields
-  bookingTypeId String?
-  isActive      Boolean           @default(true)
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  bookingType   BookingType?      @relation(fields: [bookingTypeId], references: [id], onDelete: SetNull)
-  connectionInfos ConnectionInfo[]
-
-  @@map("connection_templates")
-}
-
 model ConnectionInfo {
   id          String            @id @default(cuid())
   bookingId   String            @unique
@@ -120,14 +104,6 @@ enum BookingStatus {
   ACTIVE
   COMPLETED
   CANCELLED
-}
-
-enum ConnectionType {
-  SSH
-  WEB_URL
-  API_KEY
-  VPN
-  RDP
 }
 
 enum ResourceType {
