@@ -9,6 +9,8 @@ import { ConnectionInfoDisplay } from "@/components/connection-info"
 import { CopyAccessCodeButton } from "@/components/copy-access-code-button"
 import { CancelBookingButton } from "@/components/cancel-booking-button"
 
+export const dynamic = "force-dynamic"
+
 export default async function BookingDetailPage({
   params,
 }: {

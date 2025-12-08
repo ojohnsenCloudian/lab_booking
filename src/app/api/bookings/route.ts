@@ -140,8 +140,8 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    if (labResource && labResource.connectionMetadata) {
-      const resourceMetadata = labResource.connectionMetadata as Record<string, any>
+    if (labResource) {
+      const resourceMetadata = (labResource.connectionMetadata as Record<string, any>) || {}
       const resourceType = labResource.resourceType || "SSH"
       const values: Record<string, any> = {}
 
@@ -203,15 +203,13 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Only create connection info if we have values
-      if (Object.keys(values).length > 0) {
-        await prisma.connectionInfo.create({
-          data: {
-            bookingId: booking.id,
-            values,
-          },
-        })
-      }
+      // Always create connection info (with defaults if metadata is empty)
+      await prisma.connectionInfo.create({
+        data: {
+          bookingId: booking.id,
+          values,
+        },
+      })
     }
 
     return NextResponse.json(booking, { status: 201 })

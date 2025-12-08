@@ -77,6 +77,14 @@ export function ConnectionInfoDisplay({ connectionInfo }: ConnectionInfoDisplayP
     )
   }
 
+  if (!values || Object.keys(values).length === 0) {
+    return (
+      <div className="rounded-md border bg-muted/50 p-4">
+        <p className="text-sm text-muted-foreground">No connection information available</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-md border bg-muted/50 p-4">

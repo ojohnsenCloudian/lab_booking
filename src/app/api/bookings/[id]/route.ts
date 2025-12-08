@@ -25,11 +25,7 @@ export async function GET(
         },
         bookingType: true,
         labResource: true,
-        connectionInfo: {
-          include: {
-            template: true,
-          },
-        },
+        connectionInfo: true,
       },
     })
 
