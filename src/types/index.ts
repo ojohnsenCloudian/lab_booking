@@ -1,6 +1,6 @@
-import { Role, BookingStatus, ConnectionType } from "@prisma/client"
+import { Role, BookingStatus } from "@prisma/client"
 
-export type { Role, BookingStatus, ConnectionType }
+export type { Role, BookingStatus }
 
 export interface BookingWithRelations {
   id: string
@@ -27,12 +27,4 @@ export interface BookingWithRelations {
   }
 }
 
-export interface ConnectionTemplateFields {
-  [key: string]: {
-    type: 'string' | 'number' | 'boolean'
-    label: string
-    required?: boolean
-    default?: string | number | boolean
-  }
-}
 

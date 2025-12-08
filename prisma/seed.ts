@@ -43,7 +43,7 @@ async function main() {
   });
   console.log('Created regular user:', user.email);
 
-  // Create lab resources
+  // Create lab resources with connection metadata
   const resource1 = await prisma.labResource.upsert({
     where: { id: 'resource-1' },
     update: {},
@@ -51,6 +51,13 @@ async function main() {
       id: 'resource-1',
       name: 'Lab Server 1',
       description: 'Primary development lab server',
+      resourceType: 'SSH',
+      connectionMetadata: {
+        ip: '192.168.1.10',
+        host: 'lab-server-1.example.com',
+        username: 'labuser',
+        port: 22,
+      },
       isActive: true,
     },
   });
@@ -62,6 +69,13 @@ async function main() {
       id: 'resource-2',
       name: 'Lab Server 2',
       description: 'Secondary development lab server',
+      resourceType: 'SSH',
+      connectionMetadata: {
+        ip: '192.168.1.11',
+        host: 'lab-server-2.example.com',
+        username: 'labuser',
+        port: 22,
+      },
       isActive: true,
     },
   });
@@ -73,6 +87,13 @@ async function main() {
       id: 'resource-3',
       name: 'Testing Lab Server',
       description: 'Dedicated testing environment',
+      resourceType: 'SSH',
+      connectionMetadata: {
+        ip: '192.168.1.12',
+        host: 'test-server.example.com',
+        username: 'testuser',
+        port: 22,
+      },
       isActive: true,
     },
   });
@@ -148,44 +169,6 @@ async function main() {
   });
 
   console.log('Mapped resources to booking types');
-
-  // Create connection templates
-  const sshTemplate = await prisma.connectionTemplate.upsert({
-    where: { id: 'template-ssh' },
-    update: {},
-    create: {
-      id: 'template-ssh',
-      name: 'SSH Access',
-      type: 'SSH',
-      bookingTypeId: devType.id,
-      isActive: true,
-      fields: {
-        host: { type: 'string', label: 'Host', required: true },
-        port: { type: 'number', label: 'Port', default: 22 },
-        username: { type: 'string', label: 'Username', required: true },
-        password: { type: 'string', label: 'Password', required: true },
-      },
-    },
-  });
-
-  const webTemplate = await prisma.connectionTemplate.upsert({
-    where: { id: 'template-web' },
-    update: {},
-    create: {
-      id: 'template-web',
-      name: 'Web Access',
-      type: 'WEB_URL',
-      bookingTypeId: testType.id,
-      isActive: true,
-      fields: {
-        url: { type: 'string', label: 'URL', required: true },
-        username: { type: 'string', label: 'Username', required: true },
-        password: { type: 'string', label: 'Password', required: true },
-      },
-    },
-  });
-
-  console.log('Created connection templates');
 
   console.log('Seeding completed!');
 }
