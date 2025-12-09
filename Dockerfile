@@ -34,7 +34,8 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Install Prisma CLI for migrations (needed in production)
-RUN npm install -g prisma@latest
+# Pin to version 5 to match package.json (Prisma 7 has breaking changes)
+RUN npm install -g prisma@5.19.0
 
 # Copy necessary files
 COPY --from=builder /app/public ./public
