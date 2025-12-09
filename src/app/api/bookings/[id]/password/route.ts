@@ -5,13 +5,14 @@ import bcrypt from "bcryptjs";
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await requireAdmin();
 
     const booking = await prisma.booking.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         bookingPassword: true,

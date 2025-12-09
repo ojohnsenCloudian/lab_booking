@@ -5,13 +5,14 @@ import { BookingStatus } from "@prisma/client";
 
 export async function GET(
   request: Request,
-  { params }: { params: { bookingId: string } }
+  { params }: { params: Promise<{ bookingId: string }> }
 ) {
   try {
+    const { bookingId } = await params;
     const session = await requireAuth();
 
     const booking = await prisma.booking.findUnique({
-      where: { id: params.bookingId },
+      where: { id: bookingId },
       include: {
         labType: {
           include: {
@@ -59,7 +60,7 @@ export async function GET(
     // Log access
     await prisma.accessLog.create({
       data: {
-        bookingId: params.bookingId,
+        bookingId,
         userId: session.user.id,
         ipAddress: request.headers.get("x-forwarded-for") || undefined,
       },

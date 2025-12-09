@@ -13,13 +13,14 @@ const updateSchema = z.object({
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await requireAdmin();
 
     const resource = await prisma.labResource.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!resource) {
@@ -41,16 +42,17 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await requireAdmin();
 
     const body = await request.json();
     const data = updateSchema.parse(body);
 
     const resource = await prisma.labResource.update({
-      where: { id: params.id },
+      where: { id },
       data,
     });
 
@@ -73,13 +75,14 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await requireAdmin();
 
     await prisma.labResource.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ message: "Resource deleted" });

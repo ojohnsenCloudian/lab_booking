@@ -13,13 +13,14 @@ const updateBookingSchema = z.object({
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await requireAuth();
 
     const booking = await prisma.booking.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         user: {
           select: {
@@ -66,13 +67,14 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await requireAuth();
 
     const booking = await prisma.booking.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!booking) {
@@ -111,7 +113,7 @@ export async function PATCH(
         labTypeId,
         startTime,
         endTime,
-        params.id
+        id
       );
 
       if (!validation.valid) {
@@ -127,7 +129,7 @@ export async function PATCH(
     }
 
     const updated = await prisma.booking.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         labType: true,
@@ -159,13 +161,14 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await requireAuth();
 
     const booking = await prisma.booking.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!booking) {
@@ -184,7 +187,7 @@ export async function DELETE(
     }
 
     await prisma.booking.update({
-      where: { id: params.id },
+      where: { id },
       data: { status: "CANCELLED" },
     });
 

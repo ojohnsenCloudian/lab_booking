@@ -6,13 +6,14 @@ import { generateBookingPassword } from "@/lib/utils";
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await requireAdmin();
 
     const booking = await prisma.booking.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!booking) {
@@ -27,7 +28,7 @@ export async function POST(
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await prisma.booking.update({
-      where: { id: params.id },
+      where: { id },
       data: { bookingPassword: hashedPassword },
     });
 

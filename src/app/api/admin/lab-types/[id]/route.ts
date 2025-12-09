@@ -12,13 +12,14 @@ const updateSchema = z.object({
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await requireAdmin();
 
     const labType = await prisma.labType.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         resources: {
           include: {
@@ -47,9 +48,10 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await requireAdmin();
 
     const body = await request.json();
@@ -57,7 +59,7 @@ export async function PATCH(
 
     // Update lab type
     const labType = await prisma.labType.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name: data.name,
         maxDurationHours: data.maxDurationHours,
@@ -76,14 +78,14 @@ export async function PATCH(
     if (data.resourceIds !== undefined) {
       // Delete existing relationships
       await prisma.labTypeResource.deleteMany({
-        where: { labTypeId: params.id },
+        where: { labTypeId: id },
       });
 
       // Create new relationships
       if (data.resourceIds.length > 0) {
         await prisma.labTypeResource.createMany({
           data: data.resourceIds.map((resourceId) => ({
-            labTypeId: params.id,
+            labTypeId: id,
             resourceId,
           })),
         });
@@ -91,7 +93,7 @@ export async function PATCH(
 
       // Fetch updated lab type
       const updated = await prisma.labType.findUnique({
-        where: { id: params.id },
+        where: { id },
         include: {
           resources: {
             include: {
@@ -123,13 +125,14 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await requireAdmin();
 
     await prisma.labType.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ message: "Lab Type deleted" });

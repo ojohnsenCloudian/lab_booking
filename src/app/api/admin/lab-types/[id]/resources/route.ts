@@ -9,17 +9,18 @@ const addResourceSchema = z.object({
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAdmin();
 
+    const { id } = await params;
     const body = await request.json();
     const { resourceId } = addResourceSchema.parse(body);
 
     const labTypeResource = await prisma.labTypeResource.create({
       data: {
-        labTypeId: params.id,
+        labTypeId: id,
         resourceId,
       },
       include: {
@@ -46,11 +47,12 @@ export async function POST(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAdmin();
 
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const resourceId = searchParams.get("resourceId");
 
@@ -63,7 +65,7 @@ export async function DELETE(
 
     await prisma.labTypeResource.deleteMany({
       where: {
-        labTypeId: params.id,
+        labTypeId: id,
         resourceId,
       },
     });
