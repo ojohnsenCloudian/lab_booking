@@ -1,5 +1,5 @@
 # Use ARM64 compatible base image for Raspberry Pi 5
-FROM --platform=linux/arm64 node:20-alpine AS base
+FROM node:20-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
