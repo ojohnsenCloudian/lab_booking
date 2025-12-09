@@ -1,6 +1,4 @@
 // This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,107 +8,128 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id             String    @id @default(cuid())
-  email          String    @unique
-  password       String
-  role           Role      @default(USER)
-  lastBookingDate DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  bookings       Booking[]
-
-  @@map("users")
-}
-
-model LabResource {
-  id                  String              @id @default(cuid())
-  name                String
-  description         String?
-  resourceType        ResourceType        @default(SSH)  // SSH, WEB_URL, VPN, API_KEY
-  connectionMetadata  Json?               // Store SSH (ip, username, password), URLs, VPN config, API keys, etc.
-  isActive            Boolean             @default(true)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  bookingTypes        BookingTypeResource[]
-  bookings            Booking[]
-
-  @@map("lab_resources")
-}
-
-model BookingType {
-  id              String              @id @default(cuid())
-  name            String
-  description     String?
-  isActive        Boolean             @default(true)
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  resources       BookingTypeResource[]
-  bookings        Booking[]
-
-  @@map("booking_types")
-}
-
-model BookingTypeResource {
-  id            String       @id @default(cuid())
-  bookingTypeId String
-  labResourceId String
-  bookingType   BookingType @relation(fields: [bookingTypeId], references: [id], onDelete: Cascade)
-  labResource   LabResource @relation(fields: [labResourceId], references: [id], onDelete: Cascade)
-
-  @@unique([bookingTypeId, labResourceId])
-  @@map("booking_type_resources")
-}
-
-model Booking {
-  id              String            @id @default(cuid())
-  userId          String
-  bookingTypeId   String
-  labResourceId   String
-  startTime       DateTime
-  endTime         DateTime
-  accessCode      String            @unique
-  status          BookingStatus     @default(UPCOMING)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookingType     BookingType       @relation(fields: [bookingTypeId], references: [id], onDelete: Cascade)
-  labResource     LabResource       @relation(fields: [labResourceId], references: [id], onDelete: Cascade)
-  connectionInfo  ConnectionInfo?
-
-  @@index([labResourceId, startTime, endTime])
-  @@index([userId])
-  @@index([bookingTypeId])
-  @@map("bookings")
-}
-
-model ConnectionInfo {
-  id          String            @id @default(cuid())
-  bookingId   String            @unique
-  values      Json              // Stores actual connection data (generated from resource metadata)
-  createdAt   DateTime          @default(now())
-  booking     Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@map("connection_infos")
-}
-
-enum Role {
-  USER
+enum UserRole {
   ADMIN
-}
-
-enum BookingStatus {
-  UPCOMING
-  ACTIVE
-  COMPLETED
-  CANCELLED
+  USER
 }
 
 enum ResourceType {
   SSH
-  WEB_URL
-  VPN
-  API_KEY
+  WEB_APP
   RDP
+  VPN
 }
 
+enum ResourceStatus {
+  ONLINE
+  OFFLINE
+  MAINTENANCE
+}
+
+enum BookingStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+  
+  bookings  Booking[]
+  actionLogs ActionLog[]
+  accessLogs AccessLog[]
+}
+
+model LabResource {
+  id        String         @id @default(cuid())
+  name      String
+  type      ResourceType
+  config    Json // JSON config for credentials/URLs
+  active    Boolean        @default(true)
+  status    ResourceStatus @default(ONLINE)
+  createdAt DateTime       @default(now())
+  
+  labTypes  LabTypeResource[]
+}
+
+model LabType {
+  id              String   @id @default(cuid())
+  name            String
+  maxDurationHours Float?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  
+  resources       LabTypeResource[]
+  bookings        Booking[]
+}
+
+model LabTypeResource {
+  id          String     @id @default(cuid())
+  labTypeId   String
+  resourceId  String
+  createdAt   DateTime   @default(now())
+  
+  labType     LabType    @relation(fields: [labTypeId], references: [id], onDelete: Cascade)
+  resource    LabResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  
+  @@unique([labTypeId, resourceId])
+  @@index([labTypeId])
+  @@index([resourceId])
+}
+
+model Booking {
+  id              String        @id @default(cuid())
+  userId          String
+  labTypeId       String
+  startTime       DateTime
+  endTime         DateTime
+  status          BookingStatus @default(ACTIVE)
+  bookingPassword String        // Hashed password
+  notes           String?       // Optional notes
+  createdAt       DateTime       @default(now())
+  
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  labType         LabType       @relation(fields: [labTypeId], references: [id], onDelete: Cascade)
+  accessLogs      AccessLog[]
+  
+  @@index([userId])
+  @@index([labTypeId])
+  @@index([startTime])
+  @@index([endTime])
+  @@index([status])
+}
+
+model ActionLog {
+  id          String   @id @default(cuid())
+  action      String
+  userId      String
+  targetType  String?  // e.g., "Booking", "LabResource", "User"
+  targetId    String?
+  details     Json?    // Additional details as JSON
+  createdAt   DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+model AccessLog {
+  id          String   @id @default(cuid())
+  bookingId   String?
+  userId      String
+  accessedAt  DateTime @default(now())
+  ipAddress  String?
+  
+  booking     Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([bookingId])
+  @@index([userId])
+  @@index([accessedAt])
+}

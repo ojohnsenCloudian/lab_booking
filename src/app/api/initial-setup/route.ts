@@ -1,81 +1,72 @@
-import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
-import bcrypt from "bcryptjs"
-import { z } from "zod"
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
+import { z } from "zod";
 
 const setupSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-})
+});
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     // Check if admin already exists
     const adminCount = await prisma.user.count({
       where: {
         role: "ADMIN",
       },
-    })
+    });
 
     if (adminCount > 0) {
       return NextResponse.json(
         { error: "Admin user already exists" },
         { status: 400 }
-      )
+      );
     }
 
-    const body = await request.json()
-    const data = setupSchema.parse(body)
+    const body = await request.json();
+    const { email, password } = setupSchema.parse(body);
 
-    // Check if user with this email already exists
+    // Check if email already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email: data.email },
-    })
+      where: { email },
+    });
 
     if (existingUser) {
       return NextResponse.json(
-        { error: "User with this email already exists" },
+        { error: "Email already in use" },
         { status: 400 }
-      )
+      );
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(data.password, 10)
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create admin user
     const admin = await prisma.user.create({
       data: {
-        email: data.email,
+        email,
         password: hashedPassword,
         role: "ADMIN",
       },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-      },
-    })
+    });
 
     return NextResponse.json(
-      {
-        message: "Admin user created successfully",
-        user: admin,
-      },
+      { message: "Admin user created successfully", userId: admin.id },
       { status: 201 }
-    )
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Invalid request data", details: error.errors },
+        { error: "Invalid input", details: error.errors },
         { status: 400 }
-      )
+      );
     }
 
-    console.error("Error creating admin user:", error)
+    console.error("Error creating admin:", error);
     return NextResponse.json(
       { error: "Failed to create admin user" },
       { status: 500 }
-    )
+    );
   }
 }
-

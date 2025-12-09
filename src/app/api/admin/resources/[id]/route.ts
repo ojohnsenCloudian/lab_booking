@@ -1,75 +1,93 @@
-import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
-import { z } from "zod"
+import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/auth-helpers";
+import { prisma } from "@/lib/prisma";
+import { z } from "zod";
 
-const resourceSchema = z.object({
+const updateSchema = z.object({
   name: z.string().min(1).optional(),
-  description: z.string().optional(),
-  resourceType: z.enum(["SSH", "WEB_URL", "VPN", "API_KEY", "RDP"]).optional(),
-  isActive: z.boolean().optional(),
-  connectionMetadata: z.record(z.any()).optional(),
-})
+  type: z.enum(["SSH", "WEB_APP", "RDP", "VPN"]).optional(),
+  config: z.record(z.any()).optional(),
+  active: z.boolean().optional(),
+  status: z.enum(["ONLINE", "OFFLINE", "MAINTENANCE"]).optional(),
+});
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    await requireAdmin();
+
+    const resource = await prisma.labResource.findUnique({
+      where: { id: params.id },
+    });
+
+    if (!resource) {
+      return NextResponse.json(
+        { error: "Resource not found" },
+        { status: 404 }
+      );
     }
 
-    const { id } = await params
-    const body = await request.json()
-    const data = resourceSchema.parse(body)
+    return NextResponse.json(resource);
+  } catch (error) {
+    console.error("Error fetching resource:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch resource" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await requireAdmin();
+
+    const body = await request.json();
+    const data = updateSchema.parse(body);
 
     const resource = await prisma.labResource.update({
-      where: { id },
+      where: { id: params.id },
       data,
-    })
+    });
 
-    return NextResponse.json(resource)
+    return NextResponse.json(resource);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Invalid request data", details: error.errors },
+        { error: "Invalid input", details: error.errors },
         { status: 400 }
-      )
+      );
     }
 
-    console.error("Error updating resource:", error)
+    console.error("Error updating resource:", error);
     return NextResponse.json(
       { error: "Failed to update resource" },
       { status: 500 }
-    )
+    );
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  request: Request,
+  { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { id } = await params
+    await requireAdmin();
 
     await prisma.labResource.delete({
-      where: { id },
-    })
+      where: { id: params.id },
+    });
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ message: "Resource deleted" });
   } catch (error) {
-    console.error("Error deleting resource:", error)
+    console.error("Error deleting resource:", error);
     return NextResponse.json(
       { error: "Failed to delete resource" },
       { status: 500 }
-    )
+    );
   }
 }
-

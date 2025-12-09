@@ -1,67 +1,64 @@
-import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
-import { z } from "zod"
+import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/auth-helpers";
+import { prisma } from "@/lib/prisma";
+import { z } from "zod";
 
 const resourceSchema = z.object({
   name: z.string().min(1),
-  description: z.string().optional(),
-  resourceType: z.enum(["SSH", "WEB_URL", "VPN", "API_KEY", "RDP"]).default("SSH"),
-  isActive: z.boolean().default(true),
-  connectionMetadata: z.record(z.any()).optional(),
-})
+  type: z.enum(["SSH", "WEB_APP", "RDP", "VPN"]),
+  config: z.record(z.any()),
+  active: z.boolean().optional(),
+  status: z.enum(["ONLINE", "OFFLINE", "MAINTENANCE"]).optional(),
+});
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const session = await auth()
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    await requireAdmin();
 
     const resources = await prisma.labResource.findMany({
-      orderBy: {
-        name: "asc",
-      },
-    })
+      orderBy: { createdAt: "desc" },
+    });
 
-    return NextResponse.json(resources)
+    return NextResponse.json(resources);
   } catch (error) {
-    console.error("Error fetching resources:", error)
+    console.error("Error fetching resources:", error);
     return NextResponse.json(
       { error: "Failed to fetch resources" },
       { status: 500 }
-    )
+    );
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const session = await auth()
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    await requireAdmin();
 
-    const body = await request.json()
-    const data = resourceSchema.parse(body)
+    const body = await request.json();
+    const data = resourceSchema.parse(body);
 
     const resource = await prisma.labResource.create({
-      data,
-    })
+      data: {
+        name: data.name,
+        type: data.type,
+        config: data.config,
+        active: data.active ?? true,
+        status: data.status ?? "ONLINE",
+      },
+    });
 
-    return NextResponse.json(resource, { status: 201 })
+    return NextResponse.json(resource, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Invalid request data", details: error.errors },
+        { error: "Invalid input", details: error.errors },
         { status: 400 }
-      )
+      );
     }
 
-    console.error("Error creating resource:", error)
+    console.error("Error creating resource:", error);
     return NextResponse.json(
       { error: "Failed to create resource" },
       { status: 500 }
-    )
+    );
   }
 }
-

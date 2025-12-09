@@ -1,69 +1,68 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useToast } from "@/components/ui/use-toast"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function InitialSetupPage() {
-  const router = useRouter()
-  const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    confirmPassword: "",
-  })
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
-    checkAdminExists()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    checkAdminExists();
+  }, []);
 
   const checkAdminExists = async () => {
     try {
-      const response = await fetch("/api/initial-setup/check")
-      const data = await response.json()
+      const response = await fetch("/api/initial-setup/check");
+      const data = await response.json();
 
-      if (data.adminExists) {
-        // Admin already exists, redirect to login
-        router.push("/login")
-        return
+      if (data.hasAdmin) {
+        router.push("/login");
+      } else {
+        setChecking(false);
       }
-
-      setIsLoading(false)
     } catch (error) {
-      console.error("Error checking admin:", error)
-      setIsLoading(false)
+      console.error("Error checking admin:", error);
+      toast({
+        title: "Error",
+        description: "Failed to check admin status",
+        variant: "destructive",
+      });
     }
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    if (formData.password !== formData.confirmPassword) {
+    if (password !== confirmPassword) {
       toast({
         title: "Error",
         description: "Passwords do not match",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    if (formData.password.length < 8) {
+    if (password.length < 8) {
       toast({
         title: "Error",
         description: "Password must be at least 8 characters",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    setIsSubmitting(true)
+    setLoading(true);
 
     try {
       const response = await fetch("/api/initial-setup", {
@@ -71,51 +70,49 @@ export default function InitialSetupPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
-      })
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to create admin user")
+        throw new Error(data.error || "Failed to create admin");
       }
 
       toast({
         title: "Success",
-        description: "Admin user created successfully! Redirecting to login...",
-      })
+        description: "Admin user created successfully. Please log in.",
+      });
 
-      // Redirect to login after a short delay
       setTimeout(() => {
-        router.push("/login")
-      }, 1500)
+        router.push("/login");
+      }, 1500);
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message || "Failed to create admin user",
         variant: "destructive",
-      })
-      setIsSubmitting(false)
+      });
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
-  if (isLoading) {
+  if (checking) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <p className="text-muted-foreground">Checking setup status...</p>
+          <p>Checking setup status...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-background to-muted">
+    <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Initial Setup</CardTitle>
+        <CardHeader>
+          <CardTitle>Initial Setup</CardTitle>
           <CardDescription>
             Create the first admin user to get started
           </CardDescription>
@@ -123,18 +120,14 @@ export default function InitialSetupPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Admin Email</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@example.com"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isSubmitting}
-                autoFocus
+                placeholder="admin@example.com"
               />
             </div>
             <div className="space-y-2">
@@ -142,41 +135,30 @@ export default function InitialSetupPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 required
-                disabled={isSubmitting}
                 minLength={8}
+                placeholder="At least 8 characters"
               />
-              <p className="text-xs text-muted-foreground">
-                Must be at least 8 characters
-              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
               <Input
                 id="confirmPassword"
                 type="password"
-                placeholder="••••••••"
-                value={formData.confirmPassword}
-                onChange={(e) =>
-                  setFormData({ ...formData, confirmPassword: e.target.value })
-                }
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                disabled={isSubmitting}
                 minLength={8}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Creating admin user..." : "Create Admin User"}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Creating..." : "Create Admin User"}
             </Button>
           </form>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
-

@@ -1,19 +1,21 @@
+version: '3.8'
 
 services:
   postgres:
     image: postgres:16-alpine
+    platform: linux/arm64
     container_name: lab_booking_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-labbooking}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-labbooking123}
-      POSTGRES_DB: ${POSTGRES_DB:-lab_booking}
+      POSTGRES_USER: lab_booking
+      POSTGRES_PASSWORD: lab_booking_password
+      POSTGRES_DB: lab_booking
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-labbooking}"]
+      test: ["CMD-SHELL", "pg_isready -U lab_booking"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,22 +24,29 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      platforms:
+        - linux/arm64
+    platform: linux/arm64
     container_name: lab_booking_app
     restart: unless-stopped
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-labbooking}:${POSTGRES_PASSWORD:-labbooking123}@postgres:5432/${POSTGRES_DB:-lab_booking}?schema=public
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-your-secret-key-change-in-production}
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      DATABASE_URL: postgresql://lab_booking:lab_booking_password@postgres:5432/lab_booking?schema=public
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: change-this-secret-in-production
       NODE_ENV: production
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./prisma:/app/prisma
-    command: sh -c "cd /app && if [ -d prisma/migrations ] && [ \"$(ls -A prisma/migrations)\" ]; then node node_modules/prisma/build/index.js migrate deploy; else node node_modules/prisma/build/index.js db push --accept-data-loss; fi && exec node server.js"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/auth/signin"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   postgres_data:
-

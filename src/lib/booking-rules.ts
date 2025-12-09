@@ -1,226 +1,206 @@
-import { prisma } from "./prisma"
-import { addHours, addDays, isBefore, isAfter, differenceInHours } from "date-fns"
+import { prisma } from "./prisma";
+import { BookingStatus } from "@prisma/client";
 
-const MAX_BOOKING_DURATION_HOURS = 8
-const COOLDOWN_DAYS = 3
-const BUFFER_HOURS = 2
+export { generateBookingPassword } from "./utils";
+
+const MINIMUM_DURATION_HOURS = 1;
+const MAINTENANCE_GAP_HOURS = 2;
+const USER_COOLDOWN_DAYS = 3;
 
 export interface BookingValidationResult {
-  isValid: boolean
-  error?: string
-  availableResourceId?: string
+  valid: boolean;
+  error?: string;
 }
 
-/**
- * Validates if a booking duration is within the maximum allowed (8 hours)
- */
-export function validateBookingDuration(startTime: Date, endTime: Date): boolean {
-  const durationHours = differenceInHours(endTime, startTime)
-  return durationHours > 0 && durationHours <= MAX_BOOKING_DURATION_HOURS
-}
-
-/**
- * Checks if user has completed cooldown period (3 days) since last booking
- */
-export async function checkCooldownPeriod(userId: string): Promise<{ isValid: boolean; error?: string }> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { lastBookingDate: true },
-  })
-
-  if (!user || !user.lastBookingDate) {
-    return { isValid: true }
-  }
-
-  const cooldownEndDate = addDays(user.lastBookingDate, COOLDOWN_DAYS)
-  const now = new Date()
-
-  if (isBefore(now, cooldownEndDate)) {
-    const daysRemaining = Math.ceil(
-      (cooldownEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-    )
-    return {
-      isValid: false,
-      error: `You must wait ${daysRemaining} more day(s) before booking again. Cooldown period is ${COOLDOWN_DAYS} days.`,
-    }
-  }
-
-  return { isValid: true }
-}
-
-/**
- * Checks if a time slot conflicts with existing bookings on a resource
- * Includes 2-hour buffer before and after each booking
- */
-export async function checkResourceAvailability(
-  resourceId: string,
-  startTime: Date,
-  endTime: Date,
-  excludeBookingId?: string
-): Promise<boolean> {
-  // Calculate buffer times
-  const bufferStart = addHours(startTime, -BUFFER_HOURS)
-  const bufferEnd = addHours(endTime, BUFFER_HOURS)
-
-  // Find conflicting bookings
-  const conflictingBookings = await prisma.booking.findMany({
-    where: {
-      labResourceId: resourceId,
-      status: {
-        in: ["UPCOMING", "ACTIVE"],
-      },
-      id: excludeBookingId ? { not: excludeBookingId } : undefined,
-      OR: [
-        // Booking starts during our time slot (including buffers)
-        {
-          startTime: {
-            gte: bufferStart,
-            lte: bufferEnd,
-          },
-        },
-        // Booking ends during our time slot (including buffers)
-        {
-          endTime: {
-            gte: bufferStart,
-            lte: bufferEnd,
-          },
-        },
-        // Booking completely encompasses our time slot
-        {
-          startTime: { lte: bufferStart },
-          endTime: { gte: bufferEnd },
-        },
-      ],
-    },
-  })
-
-  return conflictingBookings.length === 0
-}
-
-/**
- * Finds an available resource within a booking type for the given time slot
- */
-export async function findAvailableResource(
-  bookingTypeId: string,
-  startTime: Date,
-  endTime: Date
-): Promise<string | null> {
-  // Get all resources for this booking type
-  const bookingType = await prisma.bookingType.findUnique({
-    where: { id: bookingTypeId },
-    include: {
-      resources: {
-        include: {
-          labResource: true,
-        },
-      },
-    },
-  })
-
-  if (!bookingType) {
-    return null
-  }
-
-  // Check each resource for availability
-  for (const resourceMapping of bookingType.resources) {
-    const resource = resourceMapping.labResource
-    if (!resource.isActive) {
-      continue
-    }
-
-    const isAvailable = await checkResourceAvailability(
-      resource.id,
-      startTime,
-      endTime
-    )
-
-    if (isAvailable) {
-      return resource.id
-    }
-  }
-
-  return null
-}
-
-/**
- * Comprehensive booking validation
- */
 export async function validateBooking(
   userId: string,
-  bookingTypeId: string,
+  labTypeId: string,
   startTime: Date,
   endTime: Date,
   excludeBookingId?: string
 ): Promise<BookingValidationResult> {
-  // Validate duration
-  if (!validateBookingDuration(startTime, endTime)) {
+  // Check minimum duration (1 hour)
+  const durationMs = endTime.getTime() - startTime.getTime();
+  const durationHours = durationMs / (1000 * 60 * 60);
+  
+  if (durationHours < MINIMUM_DURATION_HOURS) {
     return {
-      isValid: false,
-      error: `Booking duration cannot exceed ${MAX_BOOKING_DURATION_HOURS} hours`,
-    }
+      valid: false,
+      error: `Minimum booking duration is ${MINIMUM_DURATION_HOURS} hour(s)`,
+    };
   }
 
-  // Validate start time is in the future
-  if (isBefore(startTime, new Date())) {
+  // Check start time is not in the past
+  if (startTime < new Date()) {
     return {
-      isValid: false,
-      error: "Booking start time must be in the future",
-    }
+      valid: false,
+      error: "Cannot create bookings in the past",
+    };
   }
 
-  // Check cooldown period
-  const cooldownCheck = await checkCooldownPeriod(userId)
-  if (!cooldownCheck.isValid) {
+  // Get Lab Type with max duration
+  const labType = await prisma.labType.findUnique({
+    where: { id: labTypeId },
+  });
+
+  if (!labType) {
     return {
-      isValid: false,
-      error: cooldownCheck.error,
-    }
+      valid: false,
+      error: "Lab Type not found",
+    };
   }
 
-  // Find available resource
-  const availableResourceId = await findAvailableResource(
-    bookingTypeId,
-    startTime,
-    endTime
-  )
-
-  if (!availableResourceId) {
+  if (!labType.active) {
     return {
-      isValid: false,
-      error: "No available resources for the selected time slot. All resources are booked or have buffer periods.",
-    }
+      valid: false,
+      error: "Lab Type is not active",
+    };
   }
 
-  // Double-check the specific resource availability
-  const isAvailable = await checkResourceAvailability(
-    availableResourceId,
-    startTime,
-    endTime,
-    excludeBookingId
-  )
-
-  if (!isAvailable) {
+  // Check max duration if configured
+  if (labType.maxDurationHours && durationHours > labType.maxDurationHours) {
     return {
-      isValid: false,
-      error: "Resource is no longer available for the selected time slot",
-    }
+      valid: false,
+      error: `Maximum booking duration is ${labType.maxDurationHours} hour(s)`,
+    };
   }
 
-  return {
-    isValid: true,
-    availableResourceId,
+  // Check if any resources are offline
+  const resources = await prisma.labTypeResource.findMany({
+    where: { labTypeId },
+    include: { resource: true },
+  });
+
+  const offlineResources = resources.filter(
+    (lt) => !lt.resource.active || lt.resource.status === "OFFLINE"
+  );
+
+  if (offlineResources.length > 0) {
+    return {
+      valid: false,
+      error: "Some resources in this Lab Type are offline",
+    };
   }
+
+  // Check for exclusive booking conflicts (same Lab Type)
+  const conflictingBooking = await prisma.booking.findFirst({
+    where: {
+      labTypeId,
+      status: BookingStatus.ACTIVE,
+      id: excludeBookingId ? { not: excludeBookingId } : undefined,
+      OR: [
+        {
+          AND: [
+            { startTime: { lte: startTime } },
+            { endTime: { gt: startTime } },
+          ],
+        },
+        {
+          AND: [
+            { startTime: { lt: endTime } },
+            { endTime: { gte: endTime } },
+          ],
+        },
+        {
+          AND: [
+            { startTime: { gte: startTime } },
+            { endTime: { lte: endTime } },
+          ],
+        },
+      ],
+    },
+  });
+
+  if (conflictingBooking) {
+    return {
+      valid: false,
+      error: "This Lab Type is already booked for the selected time",
+    };
+  }
+
+  // Check 2-hour maintenance gap before
+  const gapBeforeEnd = new Date(startTime.getTime() - MAINTENANCE_GAP_HOURS * 60 * 60 * 1000);
+  const bookingBefore = await prisma.booking.findFirst({
+    where: {
+      labTypeId,
+      status: BookingStatus.ACTIVE,
+      id: excludeBookingId ? { not: excludeBookingId } : undefined,
+      endTime: {
+        gt: gapBeforeEnd,
+        lte: startTime,
+      },
+    },
+  });
+
+  if (bookingBefore) {
+    return {
+      valid: false,
+      error: `Must have ${MAINTENANCE_GAP_HOURS} hour gap before booking for maintenance`,
+    };
+  }
+
+  // Check 2-hour maintenance gap after
+  const gapAfterStart = new Date(endTime.getTime() + MAINTENANCE_GAP_HOURS * 60 * 60 * 1000);
+  const bookingAfter = await prisma.booking.findFirst({
+    where: {
+      labTypeId,
+      status: BookingStatus.ACTIVE,
+      id: excludeBookingId ? { not: excludeBookingId } : undefined,
+      startTime: {
+        gte: endTime,
+        lt: gapAfterStart,
+      },
+    },
+  });
+
+  if (bookingAfter) {
+    return {
+      valid: false,
+      error: `Must have ${MAINTENANCE_GAP_HOURS} hour gap after booking for maintenance`,
+    };
+  }
+
+  // Check 3-day cooldown for user
+  const cooldownDate = new Date();
+  cooldownDate.setDate(cooldownDate.getDate() - USER_COOLDOWN_DAYS);
+
+  const recentBooking = await prisma.booking.findFirst({
+    where: {
+      userId,
+      status: {
+        in: [BookingStatus.ACTIVE, BookingStatus.EXPIRED],
+      },
+      createdAt: {
+        gte: cooldownDate,
+      },
+      id: excludeBookingId ? { not: excludeBookingId } : undefined,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  if (recentBooking) {
+    return {
+      valid: false,
+      error: `Must wait ${USER_COOLDOWN_DAYS} days between bookings`,
+    };
+  }
+
+  return { valid: true };
 }
 
-/**
- * Generates a secure access code for a booking
- */
-export function generateAccessCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // Excluding confusing chars
-  let code = ""
-  for (let i = 0; i < 16; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return code
+export async function expireBookings() {
+  const now = new Date();
+  await prisma.booking.updateMany({
+    where: {
+      status: BookingStatus.ACTIVE,
+      endTime: {
+        lt: now,
+      },
+    },
+    data: {
+      status: BookingStatus.EXPIRED,
+    },
+  });
 }
-

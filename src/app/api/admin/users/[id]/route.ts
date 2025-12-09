@@ -1,39 +1,34 @@
-import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
-import bcrypt from "bcryptjs"
-import { z } from "zod"
+import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/auth-helpers";
+import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
+import { z } from "zod";
 
 const updateUserSchema = z.object({
   email: z.string().email().optional(),
   password: z.string().min(8).optional(),
-  role: z.enum(["USER", "ADMIN"]).optional(),
-})
+  role: z.enum(["ADMIN", "USER"]).optional(),
+});
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    await requireAdmin();
 
-    const { id } = await params
-    const body = await request.json()
-    const data = updateUserSchema.parse(body)
+    const body = await request.json();
+    const data = updateUserSchema.parse(body);
 
-    // Prepare update data
-    const updateData: any = {}
-    if (data.email) updateData.email = data.email
-    if (data.role) updateData.role = data.role
+    const updateData: any = {};
+    if (data.email) updateData.email = data.email;
+    if (data.role) updateData.role = data.role;
     if (data.password) {
-      updateData.password = await bcrypt.hash(data.password, 10)
+      updateData.password = await bcrypt.hash(data.password, 10);
     }
 
     const user = await prisma.user.update({
-      where: { id },
+      where: { id: params.id },
       data: updateData,
       select: {
         id: true,
@@ -41,56 +36,42 @@ export async function PUT(
         role: true,
         createdAt: true,
       },
-    })
+    });
 
-    return NextResponse.json(user)
+    return NextResponse.json(user);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Invalid request data", details: error.errors },
+        { error: "Invalid input", details: error.errors },
         { status: 400 }
-      )
+      );
     }
 
-    console.error("Error updating user:", error)
+    console.error("Error updating user:", error);
     return NextResponse.json(
       { error: "Failed to update user" },
       { status: 500 }
-    )
+    );
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  request: Request,
+  { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { id } = await params
-
-    // Prevent deleting yourself
-    if (id === session.user.id) {
-      return NextResponse.json(
-        { error: "Cannot delete your own account" },
-        { status: 400 }
-      )
-    }
+    await requireAdmin();
 
     await prisma.user.delete({
-      where: { id },
-    })
+      where: { id: params.id },
+    });
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ message: "User deleted" });
   } catch (error) {
-    console.error("Error deleting user:", error)
+    console.error("Error deleting user:", error);
     return NextResponse.json(
       { error: "Failed to delete user" },
       { status: 500 }
-    )
+    );
   }
 }
-
